@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure E2EE Chat - Add Friends & Chat</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; height: 100vh; padding: 12px; }
+        
+        /* Navigation tabs */
+        .nav-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+        .nav-tab { flex: 1; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 8px; text-align: center; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; }
+        .nav-tab.active { background: #0284c7; color: white; border-color: #0284c7; }
+
+        .view-section { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+        .view-section.active { display: flex; }
+
+        .header { background: #1e293b; padding: 12px 16px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .header h2 { font-size: 15px; color: #38bdf8; margin-bottom: 8px; }
+        .key-box { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .key-box input, .key-box select { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 8px; border-radius: 8px; font-size: 13px; outline: none; }
+        .key-box button { background: #0284c7; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; }
+
+        .chat-container { flex: 1; background: #1e293b; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #334155; }
+        .messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+        
+        .message { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.4; word-break: break-word; position: relative; }
+        .message.sent { background: #0284c7; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .message.received { background: #334155; color: #f8fafc; align-self: flex-start; border-bottom-left-radius: 2px; }
+        
+        .secret-capsule { background: rgba(0,0,0,0.3); border: 1px dashed #38bdf8; padding: 10px; border-radius: 8px; text-align: center; cursor: pointer; }
+        .secret-capsule:active { background: rgba(0,0,0,0.5); }
+        .secret-capsule p { font-size: 13px; color: #38bdf8; font-weight: 600; margin-bottom: 4px; }
+        
+        .message img, .message video { max-width: 100%; border-radius: 8px; margin-top: 4px; display: block; max-height: 200px; object-fit: cover; }
+        
+        .meta { font-size: 10px; opacity: 0.7; margin-top: 4px; display: flex; justify-content: space-between; gap: 8px; }
+        .raw-debug { font-family: monospace; font-size: 10px; color: #cbd5e1; background: rgba(0,0,0,0.2); padding: 3px 6px; border-radius: 4px; margin-top: 4px; }
+        
+        .input-box { padding: 12px; background: #1e293b; border-top: 1px solid #334155; display: flex; gap: 8px; align-items: center; }
+        .input-box input[type="text"] { flex: 1; background: #0f172a; border: 1px solid #334155; color: white; padding: 10px; border-radius: 8px; outline: none; font-size: 14px; }
+        .attach-btn { background: #334155; color: white; border: none; width: 40px; height: 40px; border-radius: 8px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .input-box button.send-btn { background: #10b981; color: white; border: none; padding: 0 14px; height: 40px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+
+        /* Danh sách bạn bè & kết bạn */
+        .panel-box { background: #1e293b; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; border: 1px solid #334155; height: 100%; overflow-y: auto; }
+        .card-item { background: #0f172a; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #334155; }
+        .my-id-badge { background: #334155; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #38bdf8; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+    <!-- Thanh chuyển đổi tính năng -->
+    <div class="nav-tabs">
+        <div class="nav-tab active" onclick="switchView('chat')">💬 Phòng Chat</div>
+        <div class="nav-tab" onclick="switchView('friends')">👥 Bạn Bè</div>
+    </div>
+
+    <!-- PHẦN 1: GIAO DIỆN CHAT -->
+    <div id="view-chat" class="view-section active">
+        <div class="header">
+            <h2>🔒 Bảo Mật & Tự Hủy</h2>
+            <div class="key-box" style="margin-top: 8px;">
+                <input type="password" id="secretKey" placeholder="Mật khẩu phòng..." value="BiMatQGia123!">
+                <select id="ttlSelect">
+                    <option value="5" selected>Hủy sau: 5s</option>
+                    <option value="10">Hủy sau: 10s</option>
+                    <option value="0">Không hủy</option>
+                </select>
+                <button onclick="alert('Đã lưu khóa!')">Khóa</button>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div class="messages" id="messageList">
+                <div class="message received">
+                    Chào mừng bạn đến với ứng dụng chat bảo mật mã hóa đầu cuối.
+                    <span class="meta"><span>Hệ thống</span><span>Vĩnh viễn</span></span>
+                </div>
+            </div>
+            
+            <div class="input-box">
+                <input type="file" id="mediaInput" accept="image/*,video/*" style="display: none;" onchange="handleMediaSelect(this)">
+                <button class="attach-btn" onclick="document.getElementById('mediaInput').click()" title="Đính kèm">📎</button>
+                <input type="text" id="messageInput" placeholder="Nhập tin nhắn..." onkeypress="if(event.key === 'Enter') sendMessage()">
+                <button class="send-btn" onclick="sendMessage()">Gửi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHẦN 2: GIAO DIỆN QUẢN LÝ BẠN BÈ & KẾT BẠN -->
+    <div id="view-friends" class="view-section">
+        <div class="panel-box">
+            <h3 style="font-size: 16px; color: #38bdf8;">Mã Thiết Bị Của Bạn</h3>
+            <div class="my-id-badge" id="myIdDisplay">Đang tải mã...</div>
+            <p style="font-size: 11px; opacity: 0.7;">Chia sẻ mã này cho người khác để họ có thể gửi lời mời kết bạn cho bạn.</p>
+            
+            <hr style="border-color: #334155; margin: 4px 0;">
+
+            <h3 style="font-size: 16px; color: #38bdf8;">Thêm Bạn Bè Mới</h3>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="targetIdInput" placeholder="Nhập mã thiết bị của bạn bè..." style="flex:1; background:#0f172a; border:1px solid #334155; color:white; padding:10px; border-radius:8px; font-size:13px; outline:none;">
+                <button onclick="sendFriendRequest()" style="background:#10b981; color:white; border:none; padding:0 14px; border-radius:8px; font-weight:600; cursor:pointer;">Kết bạn</button>
+            </div>
+
+            <h3 style="font-size: 16px; color: #38bdf8; margin-top: 8px;">Lời Mời Kết Bạn Đang Chờ</h3>
+            <div id="requestsList" style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-size: 12px; opacity: 0.6;">Chưa có lời mời kết bạn nào.</div>
+            </div>
+
+            <h3 style="font-size: 16px; color: #38bdf8; margin-top: 8px;">Danh Sách Bạn Bè</h3>
+            <div id="friendsList" style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-size: 12px; opacity: 0.6;">Chưa có bạn bè nào.</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+        import { getDatabase, ref, set, push, onChildAdded, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-YOUR-API-KEY-HERE",
+            authDomain: "your-app.firebaseapp.com",
+            databaseURL: "https://your-app-default-rtdb.firebaseio.com",
+            projectId: "your-app",
+            storageBucket: "your-app.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123:web:abc"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Quản lý ID thiết bị cá nhân
+        let myId = localStorage.getItem('chat_device_id');
+        if (!myId) {
+            myId = 'dev_' + Math.random().toString(36).substring(2, 9);
+            localStorage.setItem('chat_device_id', myId);
+        }
+        document.getElementById("myIdDisplay").innerText = myId;
+
+        // Chuyển tab giao diện
+        window.switchView = function(viewName) {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            
+            if(viewName === 'chat') {
+                document.querySelectorAll('.nav-tab')[0].classList.add('active');
+                document.getElementById('view-chat').classList.add('active');
+            } else {
+                document.querySelectorAll('.nav-tab')[1].classList.add('active');
+                document.getElementById('view-friends').classList.add('active');
+            }
+        }
+
+        // --- TÍNH NĂNG KẾT BẠN ---
+        const myRequestsRef = ref(db, `users/${myId}/requests`);
+        const myFriendsRef = ref(db, `users/${myId}/friends`);
+
+        window.sendFriendRequest = function() {
+            const targetId = document.getElementById("targetIdInput").value.trim();
+            if(!targetId || targetId === myId) return alert("Vui lòng nhập mã thiết bị hợp lệ!");
+
+            const targetRequestsRef = ref(db, `users/${targetId}/requests/${myId}`);
+            set(targetRequestsRef, {
+                senderId: myId,
+                time: Date.now()
+            }).then(() => {
+                alert("Đã gửi lời mời kết bạn thành công!");
+                document.getElementById("targetIdInput").value = "";
+            }).catch(err => alert("Lỗi gửi lời mời: " + err.message));
+        }
+
+        // Lắng nghe lời mời kết bạn tới máy này
+        onChildAdded(myRequestsRef, (snapshot) => {
+            const senderId = snapshot.key;
+            const reqList = document.getElementById("requestsList");
+            if(reqList.innerText.includes("Chưa có")) reqList.innerHTML = "";
+
+            const div = document.createElement("div");
+            div.className = "card-item";
+            div.id = `req_${senderId}`;
+            div.innerHTML = `
+                <span style="font-size: 13px;">${senderId}</span>
+                <button onclick="acceptFriend('${senderId}')" style="background:#10b981; color:white; border:none; padding:6px 10px; border-radius:6px; font-size:12px; cursor:pointer;">Đồng ý</button>
+            `;
+            reqList.appendChild(div);
+        });
+
+        window.acceptFriend = function(friendId) {
+            // Thêm vào danh sách bạn bè của mình
+            set(ref(db, `users/${myId}/friends/${friendId}`), { status: 'accepted', time: Date.now() });
+            // Thêm chiều ngược lại cho đối phương
+            set(ref(db, `users/${friendId}/friends/${myId}`), { status: 'accepted', time: Date.now() });
+            // Xóa lời mời
+            set(ref(db, `users/${myId}/requests/${friendId}`), null);
+            
+            const el = document.getElementById(`req_${friendId}`);
+            if(el) el.remove();
+            alert(`Đã kết bạn thành công với ${friendId}!`);
+        }
+
+        // Lắng nghe danh sách bạn bè
+        onValue(myFriendsRef, (snapshot) => {
+            const friendsList = document.getElementById("friendsList");
+            const data = snapshot.val();
+            if (!data) return;
+
+            friendsList.innerHTML = "";
+            Object.keys(data).forEach(friendId => {
+                const div = document.createElement("div");
+                div.className = "card-item";
+                div.innerHTML = `
+                    <span style="font-size: 13px; color:#38bdf8;">🟢 ${friendId}</span>
+                    <button onclick="startChatWith('${friendId}')" style="background:#0284c7; color:white; border:none; padding:6px 10px; border-radius:6px; font-size:12px; cursor:pointer;">Nhắn tin</button>
+                `;
+                friendsList.appendChild(div);
+            });
+        });
+
+        window.startChatWith = function(friendId) {
+            // Chuyển sang màn hình chat và đổi tên phòng dựa trên ID kết hợp của hai người
+            switchView('chat');
+            alert(`Đã chọn kết nối chat riêng với: ${friendId}`);
+        }
+
+        // --- PHẦN CHAT VÀ MÃ HÓA (ĐÃ CÓ TRƯỚC ĐÓ) ---
+        const messagesRef = ref(db, 'rooms/phong_chung_global/messages');
+
+        async function getKey(password) {
+            const enc = new TextEncoder();
+            const keyMaterial = await window.crypto.subtle.importKey(
+                "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]
+            );
+            return window.crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt: enc.encode("spck-chat-salt-fixed"), iterations: 100000, hash: "SHA-256" },
+                keyMaterial,
+                { name: "AES-GCM", length: 256 },
+                false,
+                ["encrypt", "decrypt"]
+            );
+        }
+
+        async function encryptData(plainText, password) {
+            try {
+                const key = await getKey(password);
+                const iv = window.crypto.getRandomValues(new Uint8Array(12));
+                const encoded = new TextEncoder().encode(plainText);
+                const cipherBuffer = await window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, encoded);
+
+                const combined = new Uint8Array(iv.byteLength + cipherBuffer.byteLength);
+                combined.set(iv, 0);
+                combined.set(new Uint8Array(cipherBuffer), iv.byteLength);
+                return btoa(String.fromCharCode.apply(null, combined));
+            } catch (e) { return null; }
+        }
+
+        async function decryptData(base64Cipher, password) {
+            try {
+                const key = await getKey(password);
+                const combined = Uint8Array.from(atob(base64Cipher), c => c.charCodeAt(0));
+                const iv = combined.slice(0, 12);
+                const cipherBuffer = combined.slice(12);
+                const decrypted = await window.crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, cipherBuffer);
+                return new TextDecoder().decode(decrypted);
+            } catch (e) {
+                return "[Không thể giải mã - Sai mật khẩu phòng]";
+            }
+        }
+
+        window.sendMessage = async function() {
+            const input = document.getElementById("messageInput");
+            const text = input.value.trim();
+            if (!text) return;
+            await dispatchPayload(text, 'text');
+            input.value = "";
+        }
+
+        window.handleMediaSelect = function(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const type = file.type.startsWith('video') ? 'video' : 'image';
+                    await dispatchPayload(e.target.result, type);
+                };
+                reader.readAsDataURL(file);
+                input.value = "";
+            }
+        }
+
+        async function dispatchPayload(content, type) {
+            const password = document.getElementById("secretKey").value;
+            const ttlValue = parseInt(document.getElementById("ttlSelect").value);
+            if (!password) return alert("Vui lòng nhập mật khẩu phòng!");
+
+            const encryptedContent = await encryptData(content, password);
+            push(messagesRef, {
+                ciphertext: encryptedContent,
+                contentType: type,
+                senderId: myId,
+                ttl: ttlValue,
+                time: Date.now()
+            });
+        }
+
+        onChildAdded(messagesRef, async (snapshot) => {
+            const data = snapshot.val();
+            const messageType = (data.senderId === myId) ? "sent" : "received";
+            appendSecretCapsule(data.ciphertext, messageType, data.ttl, data.contentType || 'text');
+        });
+
+        function appendSecretCapsule(rawCipher, type, ttl, contentType) {
+            const list = document.getElementById("messageList");
+            if(list.children.length === 1 && list.children[0].innerText.includes("Chào mừng bạn")) {
+                list.innerHTML = "";
+            }
+
+            const div = document.createElement("div");
+            div.className = `message ${type}`;
+            const capsuleId = 'cap_' + Math.random().toString(36).substr(2, 9);
+            div.id = capsuleId;
+
+            const ttlTextDesc = ttl > 0 ? `Chạm để mở & xem trong ${ttl}s` : `Chạm để mở (Không tự hủy)`;
+
+            div.innerHTML = `
+                <div class="secret-capsule" onclick="openSecretMessage('${capsuleId}', '${rawCipher}', '${contentType}', ${ttl})">
+                    <p>🔒 Tin nhắn bảo mật (${contentType.toUpperCase()})</p>
+                    <span style="font-size: 12px; opacity: 0.8;">${ttlTextDesc}</span>
+                </div>
+                <div class="raw-debug">Server: ${rawCipher.substring(0, 15)}...</div>
+                <div class="meta">
+                    <span>${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    <span>Bảo mật</span>
+                </div>
+            `;
+            list.appendChild(div);
+            list.scrollTop = list.scrollHeight;
+        }
+
+        window.openSecretMessage = async function(capsuleId, rawCipher, contentType, ttl) {
+            const password = document.getElementById("secretKey").value;
+            const capsuleDiv = document.getElementById(capsuleId);
+            if (!capsuleDiv) return;
+
+            const decryptedContent = await decryptData(rawCipher, password);
+
+            let innerHtmlContent = '';
+            if (contentType === 'image') {
+                innerHtmlContent = `<img src="${decryptedContent}" alt="Secure Image">`;
+            } else if (contentType === 'video') {
+                innerHtmlContent = `<video src="${decryptedContent}" controls autoplay></video>`;
+            } else {
+                innerHtmlContent = `<div style="font-size: 15px; font-weight: 500;">${escapeHtml(decryptedContent)}</div>`;
+            }
+
+            if (ttl > 0) {
+                capsuleDiv.innerHTML = `
+                    ${innerHtmlContent}
+                    <div class="meta" style="margin-top: 6px;">
+                        <span>Đã mở</span>
+                        <span id="cd_${capsuleId}" style="color: #ef4444; font-weight: bold;">Tự hủy sau ${ttl}s</span>
+                    </div>
+                `;
+
+                let timeLeft = ttl;
+                const cdElement = document.getElementById(`cd_${capsuleId}`);
+                
+                const timer = setInterval(() => {
+                    timeLeft--;
+                    if (timeLeft > 0) {
+                        if(cdElement) cdElement.innerText = `Tự hủy sau ${timeLeft}s`;
+                    } else {
+                        clearInterval(timer);
+                        if (capsuleDiv && capsuleDiv.parentNode) {
+                            capsuleDiv.style.transform = "scale(0.9)";
+                       
